@@ -1,0 +1,25 @@
+# Node.js dependencies
+node_modules/
+
+# Logs
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+
+# IDE/Editor settings
+.vscode/
+.idea/
+
+# Build files
+build/
+dist/
+
+# Certificate files (for example, if you don't want to push certificates)
+certificates/
