@@ -66,18 +66,57 @@ app.get("/api/rooms/:roomId", async (req, res) => {
   }
 });
 
-// Odaya soru ekleme
+const crypto = require("crypto");
+
+// Anahtar çevresel değişkenden alınır ve 32 byte uzunluğa ayarlanır.
+const encryptionKey = crypto
+  .createHash("sha256")
+  .update(process.env.ENCRYPTION_KEY)
+  .digest(); // 32 byte (256 bit)
+
+// Şifreleme fonksiyonu
+function encrypt(text) {
+  const iv = crypto.randomBytes(16); // Rastgele 16 byte IV
+  const cipher = crypto.createCipheriv("aes-256-cbc", encryptionKey, iv);
+  let encrypted = cipher.update(text, "utf8", "hex");
+  encrypted += cipher.final("hex");
+  return {
+    encryptedData: encrypted,
+    iv: iv.toString("hex"), // IV hex olarak döndürülüyor
+  };
+}
+
+// Şifre çözme fonksiyonu
+function decrypt(encryptedData, iv) {
+  const decipher = crypto.createDecipheriv(
+    "aes-256-cbc",
+    encryptionKey,
+    Buffer.from(iv, "hex") // IV, hex string'den Buffer'a dönüştürülüyor
+  );
+  try {
+    let decrypted = decipher.update(encryptedData, "hex", "utf8");
+    decrypted += decipher.final("utf8");
+    return decrypted;
+  } catch (error) {
+    throw new Error("Şifre çözme işlemi başarısız.");
+  }
+}
+
 app.post("/api/rooms/:roomId/questions", async (req, res) => {
   const { roomId } = req.params;
   const { question } = req.body;
+
   try {
+    const { encryptedData, iv } = encrypt(question);
+
     await pool.query(
-      "INSERT INTO questions_in_rooms (room_id, question) VALUES ($1, $2)",
-      [roomId, question]
+      "INSERT INTO questions_in_rooms (room_id, question, iv) VALUES ($1, $2, $3)",
+      [roomId, encryptedData, iv]
     );
-    res.status(201).send("Question added");
+
+    res.status(201).send("Question added securely");
   } catch (err) {
-    console.error("Error adding question:", err);
+    console.error("Error adding encrypted question:", err);
     res.status(500).send("Internal Server Error");
   }
 });
@@ -86,13 +125,20 @@ app.get("/api/rooms/:roomId/questions", async (req, res) => {
   const { roomId } = req.params;
   try {
     const result = await pool.query(
-      "SELECT question FROM questions_in_rooms WHERE room_id = $1",
+      "SELECT question, iv FROM questions_in_rooms WHERE room_id = $1",
       [roomId]
     );
-    console.log(result);
+
     if (result.rows.length > 0) {
-      // Send questions as an array of objects
-      res.status(200).json(result.rows);
+      // Şifre çözme işlemini her soru için yap
+      const decryptedQuestions = result.rows.map((row) => {
+        // Decrypt işlemi: her soruyu çöz
+        const decryptedQuestion = decrypt(row.question, row.iv);
+        return { question: decryptedQuestion };
+      });
+
+      // Şifrelenmiş olmayan çözülmüş soruları döndür
+      res.status(200).json(decryptedQuestions);
     } else {
       res.status(404).json({ error: "No questions found for this room" });
     }
