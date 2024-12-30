@@ -9,7 +9,6 @@ const pool = new Pool({
   database: process.env.SERVER_DATABASE,
   ssl: {
     rejectUnauthorized: false,
-    ca: process.env.SERVER_CA,
   },
 });
 
