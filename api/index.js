@@ -173,8 +173,42 @@ app.get("/api/getQuestionsCount/:roomId", async (req, res) => {
   }
 });
 
+async function initDatabase() {
+  try {
+    // ROOMS TABLE
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS rooms (
+        room_id SERIAL PRIMARY KEY,
+        room_name VARCHAR(255) NOT NULL UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // QUESTIONS TABLE
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS questions_in_rooms (
+        id SERIAL PRIMARY KEY,
+        room_id INTEGER NOT NULL,
+        question TEXT NOT NULL,
+        iv VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_room
+          FOREIGN KEY (room_id)
+          REFERENCES rooms(room_id)
+          ON DELETE CASCADE
+      );
+    `);
+
+    console.log("✅ All tables are ready.");
+  } catch (err) {
+    console.error("❌ Database initialization error:", err);
+  }
+}
+
+
 // Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, async () => {
+  await initDatabase();
+  console.log(`🚀 Server running on port ${PORT}`);
 });
